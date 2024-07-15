@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+  <head>
+          <style>
+		h1 {text-align: center;}
+        </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">  
+	<title>שיבוצ חדרים</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.3.2/html2canvas.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.min.js"></script>    
+  </head>
+  <body>
+    <h1>שיבוץ חדרים</h1>
+
+	<p dir="rtl">צריך להכין קובץ אקסל עם חמש עמודות: ראשונה עם שמות התלמידים, שניה עבור כל תלמיד עם מי הוא רוצה להיות (השמות צריכים להיות מופרדים בפסיק או בנקודה), שלישית עבור כל תלמיד עם מי הוא לא רוצה להיות (עם פסיק או נקודה כנ"ל) , רביעית עם שמות החדרים וחמישית עבור כל חדר כמה מקום יש בחדר. לחץ על "בחר קובץ" ובחר את הקובץ המתאים לאחר מכן לחץ על הפעל. אם יש טעויות ברשימת העדפות הן יופיעו מתחת לטבלה. ניתן להחליף בין התלמידים בעזרת לחיצה. לחיצה על תלמיד תציג מצד ימין את ההעדפות של כל אותו חדר. לחיצה על "שמירת טבלה" תשמור את הטבלה ללא הצבעים כתמונה בתקיית ההורדות.</p>
+    <input type="file" id="file_upload" />
+    <button onclick="upload()">הפעל</button>  
+    <br>
+    <br>
+	<div id="container" style="display:flex; width:100%;">
+  <div id="table-container" style="width: 85%;"></div>
+  <textarea id="json-result" style="width: 15%;"></textarea> 
+</div>
+<br>
+<br>
+ 	<div style="text-align: center;">
+    <button style="width: 100px; height: 50px; margin: 0 auto;" onclick="takeScreenshot()">שמירת טבלה</button>
+    </div>
+    <br>
+<ul id="mistakeList"></ul>
+	<li> !השם ברשימת העדפות צריך להיות <strong>בדיוק</strong> כמו השם ברשימת שמות </li>
+    <h1></h1>
+    <h13> ©עוז אריאל </h13>
+    <script>
+	
+	let data2={}
+	let rooms=[]
+	let selectedRow = null;
+    let selectedCol = null;
+	
+	function takeScreenshot() {
+            displayTable(true)
+			html2canvas(document.getElementById("table-container")).then(function(canvas) {
+				var imgData = canvas.toDataURL('image/png');
+				var filename = 'שיבוץ חדרים.png';
+				saveScreenshot(imgData, filename);
+			});
+            displayTable(false)
+        }
+
+	function saveScreenshot(data, filename) {
+			var a = document.createElement('a');
+			a.href = data;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+		}
+	
+    function displayTable(white) {
+			
+            var table = '<table><table style="width: 90%; height: 25%; margin:auto; table-layout:fixed;"><tr>';
+            for (var i = 0; i < rooms.length; i++) {
+                table += '<th>' + rooms[i] + '</th>';
+            }
+            table += '</tr>';
+            var maxRows = 0;
+            for (var room in data2) {
+                if (data2[room].length > maxRows) {
+                    maxRows = data2[room].length;
+                }
+            }
+            for (var i = 0; i < maxRows; i++) {
+                table += '<tr>';
+				
+                for (var j = 0; j < rooms.length; j++) {
+                    if (i < data2[rooms[j]].length) {
+                        table += '<td  style="background-color:';
+                        if (data2[rooms[j]][i][3] == 4 || white) {
+                            table += ' white;';}
+                        else if (data2[rooms[j]][i][3] === -1) {
+                            table += ' red;';}
+                        else if (data2[rooms[j]][i][3] === 1) {
+                            table += ' lightgreen;';    
+                        }
+                        else if (data2[rooms[j]][i] === 0) {
+                            table += ' grey;';    
+                        }
+                        
+                        else if (data2[rooms[j]][i][3] === 3) {
+                            table += ' lightblue;';    
+                        }
+                        table += ' height: 50px; word-wrap: break-word; border: 1px solid grey; text-align:center; border-right: 4px solid black;border-left: 4px solid black; font-weight:bold;"'
+                        table += ' onclick="handleClick(' + i + ',' + j + ')">';
+                        table += [data2[rooms[j]][i][0]] || '';
+                        table += '</td>';
+                    } else {
+                        table += '<td></td>';
+                    }
+                }
+                table += '</tr>';
+            }
+            table += '</table>';
+           
+            document.getElementById('table-container').innerHTML = table;
+        } 
+      // Method to upload a valid excel file
+    function upload() {
+		document.getElementById('mistakeList').innerHTML="";
+        var files = document.getElementById('file_upload').files;
+        if(files.length==0){
+          alert("Please choose any file...");
+          return;
+        }
+        var filename = files[0].name;
+        var extension = filename.substring(filename.lastIndexOf(".")).toUpperCase();
+        if (extension == '.XLS' || extension == '.XLSX') {
+            excelFileToJSON(files[0]);
+
+        }else{
+            alert("Please select a valid excel file.");
+        }
+      }
+       		
+	function extract_keys(XLSX,worksheet){
+
+			// Convert the worksheet to an array of objects
+			const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+			// Extract the first row into an array
+			const firstRow = data[0];
+			return firstRow
+		}
+	
+	function check_mistake_lists(name,list1, list2) {
+		const mistakeList = document.getElementById("mistakeList");
+
+	  for (let i = 0; i < list1.length; i++) {
+		if (!list2.includes(list1[i])) {
+		  const newListItem = document.createElement("li");
+		  newListItem.textContent = `יש טעות בשם \"${list1[i]}\" ברשימת העדפות של: ${name} `;
+		  mistakeList.appendChild(newListItem);
+		}
+	  }
+	}
+
+	
+	function create_data(list,keys){    
+		var max_room=0;
+		var num_students=0;
+		var sum_palce_in_rooms=0
+		var name_rooms = [];
+		var palce_in_rooms = [];
+		var num_rooms = 0;
+		var student_list=[];
+		for (var row in list) {
+			student_list.push(list[row][keys[0]]);
+			num_students=num_students+1;
+			if (list[row].hasOwnProperty(keys[3])){
+				  name_rooms.push(list[row][keys[3]]);
+				  num_rooms=num_rooms+1;
+			}
+			if (list[row].hasOwnProperty(keys[4])){
+					palce_in_rooms.push(list[row][keys[4]]);
+					sum_palce_in_rooms=sum_palce_in_rooms+list[row][keys[4]];
+					if (list[row][keys[4]] > max_room){
+							max_room=list[row][keys[4]];
+					}
+			}	
+					
+		}
+		if (num_students>sum_palce_in_rooms)
+		{return false}
+		corr_std=0;
+		var data={};
+		for (var room = 0; room < name_rooms.length; room++) {
+			students_in_room=[]
+			for (var i = 0; i <max_room ; i++){
+				if (i<palce_in_rooms[room]){
+					if (corr_std>=num_students){
+						student=["פנוי",[],[],[4]];
+						students_in_room.push(student);
+						continue;
+					}
+					var name=list[corr_std][keys[0]];    
+					var want=[]
+					if (list[corr_std].hasOwnProperty(keys[1])){
+						want=splitString(list[corr_std][keys[1]]);
+						check_mistake_lists(list[corr_std][keys[0]],want,student_list)
+						}
+					var not_want=[];
+					if (list[corr_std].hasOwnProperty(keys[2])){
+					  not_want=splitString(list[corr_std][keys[2]]);
+					  check_mistake_lists(list[corr_std][keys[0]],not_want,student_list)
+					  }
+					student=[name,want,not_want,[4]]  
+					corr_std++
+				}
+				else{
+					student=0
+				}
+				students_in_room.push(student)
+			}
+		data[name_rooms[room]] = students_in_room;
+		}
+ 
+		return data   
+	}
+	
+	function splitString(str) {
+		  // Split the string by space or comma
+		  if (str == '') {
+			return ''
+		  }
+		  
+		  let arr = str.split(/[,.]+/);
+		  // Remove any extra whitespace
+		  arr = arr.map((item) => item.trim());
+		  return arr;
+	}
+		
+	class Student {
+  constructor({name=0, want=[],not_want=[],statos=0}) {
+    this.name = name;
+    this.want = want;
+    this.not_want = not_want;
+    this.statos = statos;
+  }
+  give_data(){
+  if((this.want.length>0)||(this.not_want.length>0)){
+	var data = `\n\n\n ${this.name}  `;
+  }
+  else {data=""}
+  
+  if(this.want.length>0){
+    data += `\n רוצה להיות עם: ${this.want} `  
+  }
+  if(this.not_want.length>0){
+    data += `\n לא רוצה להיות עם: ${this.not_want}` 
+  }
+  return data; 
+}
+
+}
+	class room {
+    constructor(name=0,student_num=0,num_beds=0){
+       this.name=name;
+	   this.num_beds=num_beds;
+       this.student_num=student_num;
+       this.student_list=[];
+    }
+   add_student(Student){
+        this.student_num++
+        this.student_list.push(Student)
+   }
+   chek_room(){
+       for (let i = 0; i < this.student_list.length; i++){
+           let student1 = this.student_list[i];
+           student1.statos=0;
+        for (let j = 0; j < this.student_list.length; j++){
+            let student2 = this.student_list[j];
+            if (checkStringInList(student2.name,student1.not_want)){
+                student1.statos=-1;
+                break;
+            }
+            else if ((checkStringInList(student2.name,student1.want))){
+                student1.statos=1;
+            }
+        }
+       }
+   }
+    give_data(){
+    var data=[]
+    for (const student of this.student_list){
+		if	(student.give_data()!="")
+        data.push(student.give_data())
+    }
+    return `${this.name}: ${data}`
+    
+    }
+}
+	
+	function handleClick(row, col) {
+			var room1=new room();
+			room1.name=rooms[col];
+			for (var i=0;i<data2[rooms[col]].length;i++){
+			 if(data2[rooms[col]][i]){
+			 var std=new Student(0)
+			 std.name=data2[rooms[col]][i][0];
+			 std.want=data2[rooms[col]][i][1];
+			 std.not_want=data2[rooms[col]][i][2];
+			 room1.add_student(std) 
+			}
+				
+			}			
+			var resultEle=document.getElementById("json-result");
+            resultEle.value=room1.give_data();
+            resultEle.style.display='block';
+        	  if(data2[rooms[col]][row]!==0){
+                if (selectedRow === null && selectedCol === null) {
+                    selectedRow = row;
+                    selectedCol = col;
+                    data2[rooms[col]][row][3]=3;
+                }
+				else {
+                    var temp = data2[rooms[selectedCol]][selectedRow];
+                    data2[rooms[selectedCol]][selectedRow] = data2[rooms[col]][row];
+                    data2[rooms[col]][row]= temp;	
+                    changedata(col)
+                    changedata(selectedCol);
+                    selectedRow = null;
+                    selectedCol = null;
+				} 
+              }
+              displayTable(false);
+       	   
+		}
+    
+	function checkStringInList(str, list) {
+			if (typeof str !== 'string') {
+				return false;
+			}
+			if (!list) {
+				return false;
+			}
+			return list.includes(str);
+		}
+	
+	function changedata(col) {
+				
+			for (var i = 0; i < data2[rooms[col]].length; i++){
+				data2[rooms[col]][i][3]=4;
+			}
+					
+			for (var i = 0; i < data2[rooms[col]].length; i++){
+                if(data2[rooms[col]][i]!=0){
+					for (var h = 0; h < data2[rooms[col]].length; h++){
+                            if (data2[rooms[col]][h]==0){}
+							else if (data2[rooms[col]][h][3]==-1){}
+							else if (data2[rooms[col]][h][3]==1){
+								const want = data2[rooms[col]][h][1];
+								const dont_want = data2[rooms[col]][h][2];
+								const child = data2[rooms[col]][i][0];
+								if (checkStringInList(child,dont_want)){
+									data2[rooms[col]][h][3]=-1;
+								}
+							}
+							else if (data2[rooms[col]][h][3]==4){
+								const want = data2[rooms[col]][h][1];
+								const dont_want = data2[rooms[col]][h][2];
+								const child = data2[rooms[col]][i][0];
+								
+								 if (checkStringInList(child,dont_want)){
+									data2[rooms[col]][h][3]=-1;
+									}
+									
+								else if(checkStringInList(child,want)){
+										data2[rooms[col]][h][3]=1;
+								}	
+								
+							}
+					}
+				}
+            }
+		}
+	//Method to read excel file and convert it into JSON 
+    function excelFileToJSON(file){
+          try {
+            var reader = new FileReader();
+            reader.readAsBinaryString(file);
+            reader.onload = function(e) {
+ 
+                var data = e.target.result;
+                var workbook = XLSX.read(data, {
+                    type : 'binary'
+                });
+                var result = {};
+			
+				const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+				keys=extract_keys(XLSX,worksheet);
+			
+            
+				var roa = XLSX.utils.sheet_to_row_object_array(worksheet);
+				if (roa.length > 0) {
+					result = roa;
+					}
+				result2=create_data(result,keys);
+				if (result2==false){
+					document.getElementById('table-container').innerHTML = "<h1>יותר מידי תלמידים</h1>";
+				}
+				else{
+					data2=result2;
+					rooms = Object.keys(data2)
+					for (var i=0;i< rooms.length;i++)
+						{changedata(i)};
+					displayTable(false);
+			
+				}
+            }
+        }
+			catch(e){
+                console.error(e);
+            }
+    }
+    </script>
+
+  </body>
+</html>
